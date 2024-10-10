@@ -7,5 +7,7 @@
 /cfile/.vscode
 /cfile/tmp
 /cfile/tmp.out
-
+/QuantLib-1.36-rc
+/.vscode
+/QuantLib-1.36-rc.tar.gz
 
