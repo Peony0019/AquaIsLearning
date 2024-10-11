@@ -6,4 +6,4 @@ This is a project to records what I'm learning in MLFB course. Codes in python c
 
 Each session is named by count.
 
-Later on this project will be renamed to MLFB.
+Later on this project will be renamed or redirected to MLFB.
