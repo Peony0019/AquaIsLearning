@@ -21,6 +21,8 @@ vector<char> search(vector<vector<char>> maze){
     vector<vector<int>> visited(maze.size(), vector<int>(maze[0].size()));
     // Start from the top-left corner and go right, down, left, up.
 
+    
+
 
     return method;
 }

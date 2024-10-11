@@ -1,9 +1,0 @@
-[package]
-name = "MLFB"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-plotpy = "1.9.3"
-polars = "0.43.1"
-rand = "0.8.5"
