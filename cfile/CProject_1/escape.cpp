@@ -14,21 +14,162 @@ char Direction[4] = {'N', 'S', 'W', 'E'};
 /*
 Error info if no path was found.
 */
-string error_info = "NO PATH WAS FOUND FOR THIS MAZE.";
+string error_info = "Escape failed.\n";
+
+/*
+Define a specific structure to denote a maze.
+*/
+struct Maze{
+    int rows, cols;
+    char **room;
+};
+
+/*
+Define 2-len array for recording positions.
+Only linked to one next point.
+*/
+struct Point{
+    int row, col;
+    Point *next;
+};
+
+/*
+Define a stack structure in terms of points.
+LIFO struct.
+*/
+class Stack{
+    public:
+        Stack () {};
+        ~Stack () {};
+        bool Empty () {};
+        void Push(Point *p);
+        Point Pop();
+        void Display();
+
+    private:
+        Point *head;
+};
+
+/*
+Define a queue structure in terms of points.
+FIFO struct.
+*/
+class Queue{
+    public:
+        Queue () {} ;
+        ~Queue () {};
+        bool Empty () {};
+        void Push(Point *p);
+        Point Pop();
+        void Display();
+
+    private:
+        Point *front;
+        Point *rear;
+};
+
+/*----------------------------------------------------------------
+This Part is mainly defining basic functions Stack requires.
+----------------------------------------------------------------*/
+
+Stack::Stack (void){
+    head = NULL;
+};
+
+Stack::~Stack (void){
+    delete head;
+}
+
+bool Stack::Empty (void) {
+    if (head -> next == NULL) {
+        return true;
+    }
+    return false;
+}
+
+void Stack::Push(Point *p){
+    p -> next = head -> next;
+    head -> next = p;
+}
+
+Point Stack::Pop(){
+    if (Empty()){
+        throw("Stack is empty. Work has been interupted.");
+    }
+    Point *p = head -> next;
+    head -> next = p -> next;
+    return *p;
+}
+
+void Stack::Display(){
+    Point *p = head;
+    printf("Displays as follows:\n");
+    while (p -> next != NULL){
+        p = p -> next;
+        printf("(%d, %d) \n", p -> row, p -> col);
+    }
+}
+
+/*----------------------------------------------------------------
+This Part is mainly defining basic functions Queue requires.
+----------------------------------------------------------------*/
+
+Queue::Queue (void){
+    front = NULL;
+    rear = NULL;
+    front -> next = rear;
+};
+
+Queue::~Queue (void){
+    delete front;
+    delete rear;
+}
+
+bool Queue::Empty (void) {
+    if (front -> next == NULL) {
+        return true;
+    }
+    return false;
+}
+
+void Queue::Push(Point *p){
+    rear = p;
+    rear -> next = NULL;
+    rear = rear -> next;
+}
+
+Point Queue::Pop(){
+    if (Empty()){
+        throw("Queue is empty. Work has been interupted.");
+    }
+    Point *p = front -> next;
+    front -> next = p -> next;
+    return *p;
+}
+
+void Queue::Display(){
+    Point *p = front;
+    printf("Displays as follows:\n");
+    while (p -> next != NULL){
+        p = p -> next;
+        printf("(%d, %d) \n", p -> row, p -> col);
+    }
+}
+
+/*----------------------------------------------------------------
+This Part tries to figure out the required path, the detailed
+algorithms are in search_Stack, search_Queue, search_STL.
+----------------------------------------------------------------*/
 
 /*
 This function intends to try out a potential move to 'to'.
 */
-bool try_move(vector<vector<char>> maze, vector<vector<bool>> visited, vector<int> to) {
-    if (to.size() != 2){
-        perror("You must input a 2-len vector as where you are going to.");
-        return false;
-    }
-    if (to[0] < 0 || to[0] >= maze.size() || to[1] < 0 || to[1] >= maze[0].size()){
+bool try_move(Maze maze, Maze visited, Point to) {
+    if (to.row < 0 || to.row >= maze.rows || to.col < 0 || to.col >= maze.cols){
         // cout<<"You are trying to move out of the maze. Work has been interupted."<<"("<<to[0]<<","<<to[1]<<")"<<endl;
         return false;
     }
-    if (maze[to[0]][to[1]] != '0' && maze[to[0]][to[1]] != 'T' && !visited[to[0]][to[1]]) {
+    if (maze.room[to.row][to.col] != '@' && !visited.room[to.row][to.col]) {
         return true;
     }
     return false;
@@ -37,7 +178,7 @@ bool try_move(vector<vector<char>> maze, vector<vector<bool>> visited, vector<in
 /*
 This function will search start point to end point with DFS, and return the first path it finds.
 */
-vector<char> search(vector<vector<char>> maze, vector<int> start, vector<int> end){
+string search(vector<vector<char>> maze, vector<int> start, vector<int> end){
     // Test search function is correctly called.
     /*
     for(int i=0; i<maze.size(); i++){
@@ -157,7 +298,7 @@ int readin(string file){
         int t = int(ch) - 48;
         N = N * 10 + t;
     }
-    cout << "Gonna Process " << N << " Mazes" << endl;
+    // cout << "Gonna Process " << N << " Mazes" << endl;
 
     /*
     This part reads the maze file line by line.
@@ -198,7 +339,7 @@ int readin(string file){
                 start.push_back(maze.size());
                 start.push_back(row.size());
             }
-            if (ch == 'O') {
+            if (ch == 'O' || ch == 'T') {
                 end.push_back(maze.size());
                 end.push_back(row.size());
             }
