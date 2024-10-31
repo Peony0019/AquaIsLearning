@@ -528,7 +528,7 @@ int main(){
     }
 
     auto end_time = chrono::steady_clock::now();
-    auto running_time = std::chrono::duration<double, std::micro>(end_time - start_time).count();
-    cout<<"Program Finished in "<<running_time<<"μs"<<endl;
+    auto running_time = std::chrono::duration<double, std::milli>(end_time - start_time).count();
+    cout<<"Program Finished in "<<running_time<<"ms"<<endl;
 }
 
