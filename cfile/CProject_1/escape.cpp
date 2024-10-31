@@ -2,6 +2,7 @@
 #include<vector>
 #include<string.h>
 #include<stdio.h>
+#include<stdlib.h>
 #include<chrono>
 
 using namespace std;
@@ -14,7 +15,7 @@ char Direction[4] = {'N', 'S', 'W', 'E'};
 /*
 Error info if no path was found.
 */
-string error_info = "Escape failed.\n";
+string error_info = "Escape failed.";
 
 /*
 Define a specific structure to denote a maze.
@@ -30,7 +31,7 @@ Only linked to one next point.
 */
 struct Point{
     int row, col;
-    Point *next;
+    Point *next=NULL;
 };
 
 /*
@@ -39,9 +40,9 @@ LIFO struct.
 */
 class Stack{
     public:
-        Stack () {};
-        ~Stack () {};
-        bool Empty () {};
+        Stack ();
+        ~Stack ();
+        bool Empty ();
         void Push(Point *p);
         Point Pop();
         void Display();
@@ -56,9 +57,9 @@ FIFO struct.
 */
 class Queue{
     public:
-        Queue () {} ;
-        ~Queue () {};
-        bool Empty () {};
+        Queue ();
+        ~Queue ();
+        bool Empty ();
         void Push(Point *p);
         Point Pop();
         void Display();
@@ -73,7 +74,7 @@ This Part is mainly defining basic functions Stack requires.
 ----------------------------------------------------------------*/
 
 Stack::Stack (void){
-    head = NULL;
+    head = new Point;
 };
 
 Stack::~Stack (void){
@@ -115,8 +116,8 @@ This Part is mainly defining basic functions Queue requires.
 ----------------------------------------------------------------*/
 
 Queue::Queue (void){
-    front = NULL;
-    rear = NULL;
+    front = new Point;
+    rear = new Point;
     front -> next = rear;
 };
 
@@ -126,15 +127,16 @@ Queue::~Queue (void){
 }
 
 bool Queue::Empty (void) {
-    if (front -> next == NULL) {
+    if (front -> next == rear) {
         return true;
     }
     return false;
 }
 
 void Queue::Push(Point *p){
-    rear = p;
-    rear -> next = NULL;
+    rear -> col = p -> col;
+    rear -> row = p -> row;
+    rear -> next = new Point;
     rear = rear -> next;
 }
 
@@ -164,216 +166,362 @@ algorithms are in search_Stack, search_Queue, search_STL.
 /*
 This function intends to try out a potential move to 'to'.
 */
-bool try_move(Maze maze, Maze visited, Point to) {
-    if (to.row < 0 || to.row >= maze.rows || to.col < 0 || to.col >= maze.cols){
-        // cout<<"You are trying to move out of the maze. Work has been interupted."<<"("<<to[0]<<","<<to[1]<<")"<<endl;
+bool try_move(Maze maze, Point *to) {
+    if (to->row < 0 || to->row >= maze.rows || to->col < 0 || to->col >= maze.cols){
+        // cout<<"You are trying to move out of the maze-> Work has been interupted->"<<"("<<to[0]<<","<<to[1]<<")"<<endl;
         return false;
     }
-    if (maze.room[to.row][to.col] != '@' && !visited.room[to.row][to.col]) {
+    if (maze.room[to->row][to->col] == '.' || maze.room[to->row][to->col] == 'O' || maze.room[to->row][to->col] == 'T' || maze.room[to->row][to->col] == 'I') {
         return true;
     }
+    else if (maze.room[to->row][to->col] == '@') {
+        // cout << "You are trying to move into obstacle." << endl;
+        return false;
+    }
+    else if (maze.room[to->row][to->col] == 'V') {
+        // cout << "You are trying to visit somewhere you have visited." << endl;
+        return false;
+    }
+    perror("Invalid input occurred in the maze. Have accessed as accessible room.");
     return false;
 }
 
 /*
-This function will search start point to end point with DFS, and return the first path it finds.
+This function is used to generate escape movement from 'O' point.
 */
-string search(vector<vector<char>> maze, vector<int> start, vector<int> end){
+char get_out(Maze maze, Point *end) {
+    if (end->row == 0) return 'N';
+    if (end->row == maze.rows-1) return 'S';
+    if (end->col == 0) return 'W';
+    if (end->col == maze.cols-1) return 'E';
+    perror("Out is not on the edge, responds 'G' as substitution.");
+    return 'G';
+}
+
+/*
+This function will search start point to end point with DFS or BFS, and return the first path it finds.
+*/
+string search(Maze maze, Point *start, Point *end, string arg){
     // Test search function is correctly called.
     /*
-    for(int i=0; i<maze.size(); i++){
-        for(int j=0; j< maze[i].size(); j++){
-            cout<<maze[i][j];
+    for(int i=0; i<maze.rows; i++){
+        for(int j=0; j< maze.cols; j++){
+            cout<<maze.room[i][j];
         }
         cout<<endl;
     }
-    cout << maze[start[0]][start[1]] << endl;
-    cout << maze[end[0]][end[1]] << endl;
+    cout << maze.room[start->row][start->col] << endl;
+    cout << maze.room[end->row][end->col] << endl;
     */
-    
 
-    if (start.size() != 2){
-        perror("You must input a 2-len vector as starter.");
-    }
-    if (end.size() != 2){
-        perror("You must input a 2-len vector as ender.");
-    }
     /*
     Get ready to geenrate any path from one point to another. No matter it is I or O.
     The maze is M by N.
     */
-    int M = maze.size();
-    int N = maze[0].size();
 
-    vector<int> from(2);
-    vector<char> method;
-    vector<vector<int>> waitinglist;
-    vector<vector<bool>> visited(M, vector<bool>(N));
+    string method;
 
-    // Initialize 'from' as somewhere cannot be visited.
-    from[0] = from[1] = -1;
-
-    // Search start from start input.
-    waitinglist.push_back(start);
-    while (waitinglist.size()>0) {
-        // Get where I'm standing now.
-        vector<int> to(2);
-        vector<int> now = waitinglist.back();
-        waitinglist.pop_back();
-
-        // Denote whether new points are available.
-        bool next = false;
-
-        // Records where I have visited.
-        visited[now[0]][now[1]] = true;
-
-        // Go potentially where I can go.
-        vector<vector<int>> potential;
-        to[0] = now[0] - 1;
-        to[1] = now[1];
-        potential.push_back(to);
-        to[0] = now[0] + 1;
-        to[1] = now[1];
-        potential.push_back(to);
-        to[0] = now[0];
-        to[1] = now[1] - 1;
-        potential.push_back(to);
-        to[0] = now[0];
-        to[1] = now[1] + 1;
-        potential.push_back(to);
-
-        for (int k=0; k<4; k++){
-            if (try_move(maze, visited, potential[k])){
-                waitinglist.push_back(potential[k]);
-                next = true;
-            }
-        } // If I can go to potential[k], I push it into waitinglist and record the direction.
-
-        // End condition: pop out the end point.
-        if (now[0]==end[0] && now[1]==end[1]) {
-            int delta_1 = (now[0] - from[0] + 1) / 2;
-            int delta_2 = ((now[1] - from[1] + 1) / 2 + 2) * (1 - abs(now[0] - from[0]));
-            method.push_back(Direction[delta_1 + delta_2]);
-            break;
+    // Memory path from start to get each accessible point.
+    string path[maze.rows][maze.cols]={""};
+    int inherit[maze.rows][maze.cols][2];
+    // Initialize inherit to be some point inaccessible.
+    for (int i=0; i<maze.rows; i++) {
+        for (int j=0; j<maze.cols; j++) {
+            inherit[i][j][0] = -1;
+            inherit[i][j][1] = -1;
         }
-
-        // Formulate path with where I from.
-        if (from[0]==-1 && from[1]==-1) {
-            from = now;
-            continue;
-        }
-        else if (!next) {
-            method.pop_back();
-        }
-        else {
-            int delta_1 = (now[0] - from[0] + 1) / 2;
-            int delta_2 = ((now[1] - from[1] + 1) / 2 + 2) * (1 - abs(now[0] - from[0]));
-            method.push_back(Direction[delta_1 + delta_2]);
-        }
-        from = now;
     }
+
+    // Remember the end. In case check way out.
+    char END = maze.room[end->row][end->col];
+
+    // Search start from start input by different methods.
+    if (arg == "-Stack") {
+        Stack waitinglist;
+        waitinglist.Push(start);
+        while (!waitinglist.Empty()) {
+            // Get where I'm standing now.
+            Point now = waitinglist.Pop();
+
+            // Denote whether new points are available.
+            bool next = false;
+
+            // Records where I have visited.
+            maze.room[now.row][now.col] = 'V';
+        
+            // Go potentially where I can go.
+            Point *to = new Point;
+            to->row = now.row - 1;
+            to->col = now.col;
+            if (try_move(maze, to)) {
+                if (inherit[to->row][to->col][0] == -1) {
+                    waitinglist.Push(to);
+                    inherit[to->row][to->col][0] = now.row;
+                    inherit[to->row][to->col][1] = now.col;
+                    next = true;
+                }
+            }
+
+            to = new Point;
+            to->row = now.row + 1;
+            to->col = now.col;
+            if (try_move(maze, to)) {
+                if (inherit[to->row][to->col][0] == -1) {
+                    waitinglist.Push(to);
+                    inherit[to->row][to->col][0] = now.row;
+                    inherit[to->row][to->col][1] = now.col;
+                    next = true;
+                }
+            }
+
+            to = new Point;
+            to->row = now.row;
+            to->col = now.col - 1;
+            if (try_move(maze, to)) {
+                if (inherit[to->row][to->col][0] == -1) {
+                    waitinglist.Push(to);
+                    inherit[to->row][to->col][0] = now.row;
+                    inherit[to->row][to->col][1] = now.col;
+                    next = true;
+                }
+            }
+
+            to = new Point;
+            to->row = now.row;
+            to->col = now.col + 1;
+            if (try_move(maze, to)) {
+                if (inherit[to->row][to->col][0] == -1) {
+                    waitinglist.Push(to);
+                    inherit[to->row][to->col][0] = now.row;
+                    inherit[to->row][to->col][1] = now.col;
+                    next = true;
+                }
+            }// If I can go to 'to', I push it into waitinglist and record the direction.
+            
+            // Formulate path with where I from.
+            // Basically happens to starter.
+            if (inherit[now.row][now.col][0]==-1) {
+                continue;
+            }
+
+            // Calculate the direction from 'now'
+            int delta_1 = (now.row - inherit[now.row][now.col][0] + 1) / 2;
+            int delta_2 = ((now.col - inherit[now.row][now.col][1] + 1) / 2 + 2) * (1 - abs(now.row - inherit[now.row][now.col][0]));
+            path[now.row][now.col] = path[inherit[now.row][now.col][0]][inherit[now.row][now.col][1]] + Direction[delta_1 + delta_2];
+
+            // Test whether goes to right path. For debugging.
+            // cout << "To get " << now.row << " " << now.col << " : " << method << endl;
+
+            if (now.row==end->row && now.col==end->col) {
+                break;
+            }
+        }
+    }
+
+    else if (arg == "-Queue") {
+        Queue waitinglist;
+        waitinglist.Push(start);
+
+        while (!waitinglist.Empty()) {
+            // Check if queue is correctly remembered.
+            // waitinglist.Display();
+
+            // Get where I'm standing now.
+            Point now = waitinglist.Pop();
+
+            // Denote whether new points are available.
+            bool next = false;
+
+            // Records where I have visited.
+            maze.room[now.row][now.col] = 'V';
+
+            // Test whether goes to right path.
+            /*
+            cout << "At" << now.row << " " << now.col << endl;
+            cout << "To get there: "<< method << endl;
+            */
+
+            // Go potentially where I can go.
+            Point *to = new Point;
+            to->row = now.row - 1;
+            to->col = now.col;
+            if (try_move(maze, to)) {
+                if (inherit[to->row][to->col][0] == -1) {
+                    waitinglist.Push(to);
+                    inherit[to->row][to->col][0] = now.row;
+                    inherit[to->row][to->col][1] = now.col;
+                    next = true;
+                }
+            }
+
+            to = new Point;
+            to->row = now.row + 1;
+            to->col = now.col;
+            if (try_move(maze, to)) {
+                if (inherit[to->row][to->col][0] == -1) {
+                    waitinglist.Push(to);
+                    inherit[to->row][to->col][0] = now.row;
+                    inherit[to->row][to->col][1] = now.col;
+                    next = true;
+                }
+            }
+
+            to = new Point;
+            to->row = now.row;
+            to->col = now.col - 1;
+            if (try_move(maze, to)) {
+                if (inherit[to->row][to->col][0] == -1) {
+                    waitinglist.Push(to);
+                    inherit[to->row][to->col][0] = now.row;
+                    inherit[to->row][to->col][1] = now.col;
+                    next = true;
+                }
+            }
+
+            to = new Point;
+            to->row = now.row;
+            to->col = now.col + 1;
+            if (try_move(maze, to)) {
+                if (inherit[to->row][to->col][0] == -1) {
+                    waitinglist.Push(to);
+                    inherit[to->row][to->col][0] = now.row;
+                    inherit[to->row][to->col][1] = now.col;
+                    next = true;
+                }
+            }// If I can go to 'to', I push it into waitinglist and record the direction.
+            
+            // Formulate path with where I from.
+            // Basically happens to starter.
+            if (inherit[now.row][now.col][0]==-1) {
+                continue;
+            }
+
+            // Calculate the direction from 'now'
+            int delta_1 = (now.row - inherit[now.row][now.col][0] + 1) / 2;
+            int delta_2 = ((now.col - inherit[now.row][now.col][1] + 1) / 2 + 2) * (1 - abs(now.row - inherit[now.row][now.col][0]));
+            path[now.row][now.col] = path[inherit[now.row][now.col][0]][inherit[now.row][now.col][1]] + Direction[delta_1 + delta_2];
+
+            // End condition: pop out the end point.
+            if (now.row==end->row && now.col==end->col) {
+                break;
+            }
+
+            // For debugging.
+            // cout<<method<<endl;
+        }
+    }
+    method = path[end->row][end->col];
+    if (END == 'O'){
+        method.push_back(get_out(maze, end));
+    }
+    maze.room[end->row][end->col] = END; // Recover the end for identify tunnel.
     return method;
 }
 
 /*
 The function is still complicated with readin and processing.
-Intend to do readin single maze here. But for each maze, begin with last \n and end with \n. 
-The last one end with EOF.
+A single step separating readin maze as (maze, start, end) will solve it.
+Just throw for loop into search func will do.
 */
-int readin(string file){
-    // Definition part
-    vector<vector<char>> maze;
-
-    // If IO is realized by ifstream / ostream.
-    FILE *fp;
-    char ch;
-    fp = fopen(file.c_str(), "r");
-    if (fp == NULL){
-        cout << "Error opening file." << endl;
-        return -1;
-    }
-    //Get the number first.
-    int N=0;
-    while((ch=fgetc(fp))!='\n'){
-        int t = int(ch) - 48;
-        N = N * 10 + t;
-    }
+int readin(string arg){
+    // Get the number first.
+    int N;
+    cin >> N;
     // cout << "Gonna Process " << N << " Mazes" << endl;
 
     /*
     This part reads the maze file line by line.
     */
-    vector<int> start;
-    vector<int> end;
-    vector<char> row;
-    //If the number N is not given, use while like this.
-    while ((ch = fgetc(fp))!= EOF){
-        if (ch == ' ') {
-            continue;
+    Point *start = new Point;
+    Point *end = new Point;
+    
+    // If the number N is not given, use while.
+    for (int cnt = 0; cnt < N; cnt++){
+        // Initialize an unaccessible point.
+        end->row = -1;
+
+        // cin each maze's size info.
+        Maze maze;
+        cin >> maze.rows >> maze.cols;
+        maze.room = (char **)malloc(sizeof(char *) * maze.rows);
+        for (int i = 0; i < maze.rows; i++) {
+            maze.room[i] = (char *)malloc(sizeof(char)*maze.cols);
         }
-        else if (ch == '\n') {
-            char ci = fgetc(fp);
-            // Once the program went through one maze, solve it.
-            maze.push_back(row);
-            row.clear();
-            if (ci == '\n') {
-                vector<char> ans = search(maze, start, end);
-                maze.clear();
-                if (ans.size() == 0) {
-                    cout << error_info;
-                } // If no path was found.
-                else
-                for(int k=0; k<ans.size(); k++){
-                    cout<<ans[k];
-                }cout<<endl;
-                start.clear();
-                end.clear();
-            }
-            else {
-                ungetc(ci, fp);
+
+        for (int i = 0; i < maze.rows; i++){
+            for (int j = 0; j < maze.cols; j++) {
+                char tmp;
+                cin >> tmp;
+                if (tmp == 'I') {
+                    start->row = i;
+                    start->col = j;
+                }
+                else if (tmp == 'T') {
+                    end->row = i;
+                    end->col = j;
+                }
+                else if (tmp == 'O' && end->row == -1) {
+                    end->row = i;
+                    end->col = j;
+                }
+                maze.room[i][j] = tmp;
             }
         }
-        else {
-            // Before push in the node, records Input and Output point first.
-            if (ch == 'I') {
-                start.push_back(maze.size());
-                start.push_back(row.size());
-            }
-            if (ch == 'O' || ch == 'T') {
-                end.push_back(maze.size());
-                end.push_back(row.size());
-            }
-            row.push_back(ch);
-        }
-    }
-    // Process if the file ends without inputting the last maze.
-    if (maze.size() > 0) {
-        if (row.size() > 0){
-            maze.push_back(row);
-            row.clear();
-        }
-        vector<char> ans = search(maze, start, end);
+
+        // Check and search a way out.
+        string ans = search(maze, start, end, arg);
         if (ans.size() == 0) {
             cout << error_info;
         }
-        else
-        for (int k=0; k<ans.size(); k++) {
-            cout<<ans[k];
-        }cout<<endl;
+        else {
+            cout << ans;
+        }
+        cout<<endl;
+
+        // Abnormal dungeon process early stopping.
+        if (cnt < N - 1 && maze.room[end->row][end->col] == 'T') {
+            cout << "Early escape! Put him back to dungeon: " << endl;
+            
+        }
+        if (cnt == N - 1 && maze.room[end->row][end->col] != 'T') {
+            cout << "You have go to the end without escaping. Failed escape." << endl;
+        }
     }
-    fclose(fp);
     return 0;
 }
 
+string check_arg(int argc, char *argv[]){
+    if (argc!= 2) {
+        cout << "Wrong arguments number: " << argv[0] << endl;
+        exit(1);
+    }
+    if (argv[1] == string("-Stack") || argv[1] == string("-Queue")){
+        return argv[1];
+    }
+    else {
+        cout << "Wrong arguments: " << argv[1] << ", should be -Stack/-Queue" << endl;
+        exit(1);
+    }
+}
+
+int main(int argc, char *argv[]){
+
+    // This part is for debugging.
+/*
 int main(){
+    int argc = 2;
+    char *argv[] = {(char *) "-Queue", (char *) "-Queue"};
+*/    
+
     // Timer part.
     auto start_time = chrono::steady_clock::now();
 
+    string arg = check_arg(argc, argv);
+
     int status;
-    string file="example";
-    status = readin(file);
+    status = readin(arg);
     if (status == 0) {
-        cout << "Soln Success" << endl;
+        // cout << "Soln Success" << endl;
     }
     else if (status == -1) {
         cout << "Soln Failed Somewhere" << endl;
